@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Students Manager</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  h1 { margin-bottom: 1rem; }
+  form { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  input { padding: .5rem; border: 1px solid #bbb; border-radius: 4px; flex: 1; min-width: 120px; }
+  button { padding: .5rem .9rem; border: 0; border-radius: 4px; background: #2563eb; color: #fff; cursor: pointer; }
+  button.secondary { background: #6b7280; }
+  button.danger { background: #dc2626; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: .5rem; border-bottom: 1px solid #ddd; }
+  td.actions { display: flex; gap: .4rem; }
+  #error { color: #b91c1c; min-height: 1.4rem; margin-bottom: .5rem; }
+  .empty { color: #777; text-align: center; }
+</style>
+</head>
+<body>
+<h1>Students Manager</h1>
+<div id="error" role="alert"></div>
+<form id="student-form">
+  <input id="name" placeholder="Name" required>
+  <input id="age" type="number" min="1" max="120" placeholder="Age" required>
+  <input id="className" placeholder="Class" required>
+  <button type="submit" id="submit-btn">Add</button>
+  <button type="button" id="cancel-btn" class="secondary" hidden>Cancel</button>
+</form>
+<table>
+  <thead><tr><th>Name</th><th>Age</th><th>Class</th><th></th></tr></thead>
+  <tbody id="students"></tbody>
+</table>
+
+<script>
+  const API = '/api/students';
+  const form = document.getElementById('student-form');
+  const nameInput = document.getElementById('name');
+  const ageInput = document.getElementById('age');
+  const classInput = document.getElementById('className');
+  const submitBtn = document.getElementById('submit-btn');
+  const cancelBtn = document.getElementById('cancel-btn');
+  const errorBox = document.getElementById('error');
+  const tbody = document.getElementById('students');
+  let editingId = null;
+
+  async function request(url, options) {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      let message = 'Request failed (' + response.status + ')';
+      try { message = (await response.json()).detail || message; } catch (e) { /* no body */ }
+      throw new Error(message);
+    }
+    return response.status === 204 ? null : response.json();
+  }
+
+  function showError(error) { errorBox.textContent = error ? error.message : ''; }
+
+  async function load() {
+    try {
+      const students = await request(API);
+      render(students);
+      showError(null);
+    } catch (e) { showError(e); }
+  }
+
+  function render(students) {
+    tbody.replaceChildren();
+    if (students.length === 0) {
+      const row = tbody.insertRow();
+      const cell = row.insertCell();
+      cell.colSpan = 4;
+      cell.className = 'empty';
+      cell.textContent = 'No students yet';
+      return;
+    }
+    for (const s of students) {
+      const row = tbody.insertRow();
+      row.insertCell().textContent = s.name;
+      row.insertCell().textContent = s.age;
+      row.insertCell().textContent = s.className;
+      const actions = row.insertCell();
+      actions.className = 'actions';
+      actions.append(
+        button('Edit', 'secondary', () => startEdit(s)),
+        button('Delete', 'danger', () => remove(s.id))
+      );
+    }
+  }
+
+  function button(label, cls, handler) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.className = cls;
+    b.type = 'button';
+    b.addEventListener('click', handler);
+    return b;
+  }
+
+  function startEdit(s) {
+    editingId = s.id;
+    nameInput.value = s.name;
+    ageInput.value = s.age;
+    classInput.value = s.className;
+    submitBtn.textContent = 'Update';
+    cancelBtn.hidden = false;
+  }
+
+  function resetForm() {
+    editingId = null;
+    form.reset();
+    submitBtn.textContent = 'Add';
+    cancelBtn.hidden = true;
+  }
+
+  async function remove(id) {
+    if (!confirm('Delete this student?')) return;
+    try {
+      await request(API + '/' + id, { method: 'DELETE' });
+      if (editingId === id) resetForm();
+      await load();
+    } catch (e) { showError(e); }
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const body = JSON.stringify({
+      name: nameInput.value,
+      age: Number(ageInput.value),
+      className: classInput.value
+    });
+    const url = editingId === null ? API : API + '/' + editingId;
+    try {
+      await request(url, {
+        method: editingId === null ? 'POST' : 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body
+      });
+      resetForm();
+      await load();
+    } catch (e) { showError(e); }
+  });
+
+  cancelBtn.addEventListener('click', resetForm);
+  load();
+</script>
+</body>
+</html>
