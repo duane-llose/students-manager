@@ -15,31 +15,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class StudentService {
 
     private final StudentRepository repository;
-    private final StudentMapper mapper;
 
-    public StudentService(StudentRepository repository, StudentMapper mapper) {
+    public StudentService(StudentRepository repository) {
         this.repository = repository;
-        this.mapper = mapper;
     }
 
     public StudentResponse create(StudentRequest request) {
-        return mapper.toResponse(repository.save(mapper.toEntity(request)));
+        return StudentMapper.toResponse(repository.save(StudentMapper.toEntity(request)));
     }
 
     @Transactional(readOnly = true)
     public List<StudentResponse> findAll() {
-        return repository.findAll().stream().map(mapper::toResponse).toList();
+        return repository.findAll().stream().map(StudentMapper::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public StudentResponse findById(Long id) {
-        return mapper.toResponse(getOrThrow(id));
+        return StudentMapper.toResponse(getOrThrow(id));
     }
 
     public StudentResponse update(Long id, StudentRequest request) {
         Student student = getOrThrow(id);
-        mapper.updateEntity(student, request);
-        return mapper.toResponse(repository.save(student));
+        StudentMapper.updateEntity(student, request);
+        return StudentMapper.toResponse(repository.save(student));
     }
 
     public void delete(Long id) {
